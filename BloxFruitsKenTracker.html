@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XP & Dodge Tracker</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Removes the default spinners from number input fields */
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+        /* Custom styles for toggle buttons */
+        .toggle-btn {
+            transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out;
+            border: 2px solid transparent;
+        }
+        .toggle-btn.active {
+            border-color: #facc15; /* yellow-400 */
+            box-shadow: 0 0 10px rgba(250, 204, 21, 0.5);
+        }
+        .toggle-btn:active {
+            transform: scale(0.97);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200">
+
+    <!-- Screen 1: XP Input -->
+    <div id="xp-screen" class="flex flex-col items-center justify-center min-h-screen p-4">
+        <h1 class="text-3xl md:text-4xl font-bold mb-6 text-center">Enter Your Current XP</h1>
+        <input type="number" id="xp-input" placeholder="e.g., 1250" class="w-full max-w-xs text-3xl font-bold text-center bg-gray-800 border-2 border-gray-600 rounded-lg p-3 mb-6 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <button id="calculate-btn" class="w-full max-w-xs bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg text-xl transition-transform transform hover:scale-105">
+            Calculate
+        </button>
+        <p id="xp-error" class="text-red-500 mt-4 hidden">Please enter a valid XP value.</p>
+    </div>
+
+    <!-- Screen 2: Main Tracker Dashboard -->
+    <div id="main-screen" class="hidden flex-col items-center justify-center min-h-screen p-4 space-y-6">
+        <!-- Stats Display -->
+        <div class="flex flex-wrap justify-center gap-8 w-full">
+            <div class="text-center">
+                <h2 class="text-2xl font-bold text-gray-400">Total Dodges</h2>
+                <p id="total-dodges-display" class="text-7xl font-black text-yellow-400">0</p>
+            </div>
+            <div class="text-center">
+                <h2 class="text-2xl font-bold text-gray-400">Current XP</h2>
+                <p id="xp-display" class="text-7xl font-black text-blue-400">0</p>
+            </div>
+        </div>
+
+        <!-- Gear & Race Toggles -->
+        <div class="w-full max-w-md p-4 bg-gray-800 rounded-xl">
+            <h3 class="text-xl font-bold text-center mb-4">Gear & Race</h3>
+            <div class="grid grid-cols-1 gap-3">
+                <button id="human-toggle" class="toggle-btn bg-red-600 text-white font-bold py-3 rounded-lg" data-bonus="1">Human v2</button>
+                <button id="scarf-toggle" class="toggle-btn bg-red-600 text-white font-bold py-3 rounded-lg" data-bonus="2">Pale Scarf</button>
+                <button id="cloak-toggle" class="toggle-btn bg-red-600 text-white font-bold py-3 rounded-lg" data-bonus="1">Holiday Cloak</button>
+            </div>
+        </div>
+        
+        <!-- Update Button -->
+        <button id="update-xp-btn" class="w-full max-w-xs bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-6 rounded-2xl text-2xl transition-transform transform hover:scale-105 shadow-lg">
+            Update XP
+        </button>
+    </div>
+
+    <script>
+        // State variables
+        let currentXp = 0;
+        let totalDodges = 0;
+
+        // Screen Elements
+        const xpScreen = document.getElementById('xp-screen');
+        const mainScreen = document.getElementById('main-screen');
+
+        // --- Screen 1: XP Input ---
+        const xpInput = document.getElementById('xp-input');
+        const calculateBtn = document.getElementById('calculate-btn');
+        const xpError = document.getElementById('xp-error');
+        
+        // --- Screen 2: Main Tracker ---
+        const totalDodgesDisplay = document.getElementById('total-dodges-display');
+        const xpDisplay = document.getElementById('xp-display');
+        const updateXpBtn = document.getElementById('update-xp-btn');
+        const humanToggle = document.getElementById('human-toggle');
+        const scarfToggle = document.getElementById('scarf-toggle');
+        const cloakToggle = document.getElementById('cloak-toggle');
+
+        // --- Logic ---
+
+        function calculateBaseDodges(exp) {
+            if (exp >= 0 && exp <= 59) return 2;
+            if (exp >= 60 && exp <= 329) return 3;
+            if (exp >= 330 && exp <= 816) return 4;
+            if (exp >= 817 && exp <= 1416) return 5;
+            if (exp >= 1417 && exp <= 2099) return 6;
+            if (exp >= 2100 && exp <= 2823) return 7;
+            if (exp >= 2824) return 8;
+            return 2; // Default
+        }
+
+        // The main function to calculate and update everything
+        function updateStats() {
+            const baseDodges = calculateBaseDodges(currentXp);
+            let bonusDodges = 0;
+
+            if (humanToggle.classList.contains('active')) {
+                bonusDodges += parseInt(humanToggle.dataset.bonus, 10);
+            }
+            if (scarfToggle.classList.contains('active')) {
+                bonusDodges += parseInt(scarfToggle.dataset.bonus, 10);
+            }
+            if (cloakToggle.classList.contains('active')) {
+                bonusDodges += parseInt(cloakToggle.dataset.bonus, 10);
+            }
+
+            totalDodges = baseDodges + bonusDodges;
+
+            // Update the display
+            xpDisplay.textContent = currentXp;
+            totalDodgesDisplay.textContent = totalDodges;
+        }
+
+        // Function to set a toggle's state (active/inactive)
+        function setToggleState(toggle, isActive) {
+            if (isActive) {
+                toggle.classList.add('active', 'bg-green-600');
+                toggle.classList.remove('bg-red-600');
+            } else {
+                toggle.classList.remove('active', 'bg-green-600');
+                toggle.classList.add('bg-red-600');
+            }
+        }
+
+        // --- Event Listeners ---
+
+        // Initial Calculation
+        calculateBtn.addEventListener('click', () => {
+            const xpValue = parseInt(xpInput.value, 10);
+            if (isNaN(xpValue) || xpValue < 0) {
+                xpError.classList.remove('hidden');
+                return;
+            }
+            xpError.classList.add('hidden');
+            
+            currentXp = xpValue;
+            
+            // Go to the main screen and run the first calculation
+            xpScreen.classList.add('hidden');
+            mainScreen.classList.remove('hidden');
+            mainScreen.classList.add('flex');
+            updateStats();
+        });
+
+        // Human v2 Toggle
+        humanToggle.addEventListener('click', () => {
+            const isActive = humanToggle.classList.toggle('active');
+            setToggleState(humanToggle, isActive);
+            updateStats();
+        });
+
+        // Pale Scarf Toggle
+        scarfToggle.addEventListener('click', () => {
+            const wasActive = scarfToggle.classList.contains('active');
+            // Deactivate both first, then activate the one that was clicked (if it wasn't already active)
+            setToggleState(scarfToggle, false);
+            setToggleState(cloakToggle, false);
+            if (!wasActive) {
+                setToggleState(scarfToggle, true);
+            }
+            updateStats();
+        });
+
+        // Holiday Cloak Toggle
+        cloakToggle.addEventListener('click', () => {
+            const wasActive = cloakToggle.classList.contains('active');
+            setToggleState(scarfToggle, false);
+            setToggleState(cloakToggle, false);
+            if (!wasActive) {
+                setToggleState(cloakToggle, true);
+            }
+            updateStats();
+        });
+
+        // Update XP Button
+        updateXpBtn.addEventListener('click', () => {
+            const xpToAdd = totalDodges * 2;
+            currentXp += xpToAdd;
+            // Recalculate everything since base dodges might have changed
+            updateStats();
+        });
+
+    </script>
+</body>
+</html>
