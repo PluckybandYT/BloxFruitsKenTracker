@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>XP & Dodge Tracker</title>
     <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -49,17 +49,24 @@
     </div>
 
     <!-- Screen 2: Main Tracker Dashboard -->
-    <div id="main-screen" class="hidden flex-col items-center justify-center min-h-screen p-4 space-y-6">
+    <div id="main-screen" class="hidden flex-col items-center justify-center min-h-screen p-4 space-y-10">
         <!-- Stats Display -->
-        <div class="flex flex-wrap justify-center gap-8 w-full">
-            <div class="text-center">
-                <h2 class="text-2xl font-bold text-gray-400">Total Dodges</h2>
-                <p id="total-dodges-display" class="text-7xl font-black text-yellow-400">0</p>
-            </div>
-            <div class="text-center">
-                <h2 class="text-2xl font-bold text-gray-400">Current XP</h2>
-                <p id="xp-display" class="text-7xl font-black text-blue-400">0</p>
-            </div>
+        <div class="flex justify-center gap-28 w-full max-w-4xl">
+          <!-- Left Column -->
+          <div class="text-center">
+            <p id="total-dodges-display" class="text-7xl font-black text-yellow-400">0</p>
+            <p class="text-yellow-400 font-semibold mt-2 text-xl">Total Dodges</p>
+            <p id="xp-to-next-display" class="text-green-400 font-black text-4xl mt-6">0</p>
+            <p class="text-green-400 font-semibold mt-1 text-lg">XP until next dodge</p>
+          </div>
+
+          <!-- Right Column -->
+          <div class="text-center">
+            <p id="xp-display" class="text-7xl font-black text-blue-400">0</p>
+            <p class="text-blue-400 font-semibold mt-2 text-xl">Current XP</p>
+            <p id="server-hops-display" class="text-purple-400 font-black text-4xl mt-6">0</p>
+            <p class="text-purple-400 font-semibold mt-1 text-lg">Estimated server hops</p>
+          </div>
         </div>
 
         <!-- Gear & Race Toggles -->
@@ -95,6 +102,8 @@
         // --- Screen 2: Main Tracker ---
         const totalDodgesDisplay = document.getElementById('total-dodges-display');
         const xpDisplay = document.getElementById('xp-display');
+        const xpToNextDisplay = document.getElementById('xp-to-next-display');
+        const serverHopsDisplay = document.getElementById('server-hops-display');
         const updateXpBtn = document.getElementById('update-xp-btn');
         const humanToggle = document.getElementById('human-toggle');
         const scarfToggle = document.getElementById('scarf-toggle');
@@ -102,6 +111,7 @@
 
         // --- Logic ---
 
+        // Use original ranges, last range extended to 5000 max XP
         function calculateBaseDodges(exp) {
             if (exp >= 0 && exp <= 59) return 2;
             if (exp >= 60 && exp <= 329) return 3;
@@ -113,7 +123,40 @@
             return 2; // Default
         }
 
-        // The main function to calculate and update everything
+        // XP thresholds for next dodge tier, last one extended to 5000
+        function getNextDodgeXp(exp) {
+            if (exp >= 2824 && exp < 5000) return 5000; // extended max
+            if (exp >= 5000) return null; // max reached
+            if (exp <= 59) return 60;
+            if (exp <= 329) return 330;
+            if (exp <= 816) return 817;
+            if (exp <= 1416) return 1417;
+            if (exp <= 2099) return 2100;
+            if (exp <= 2823) return 2824;
+            return null;
+        }
+
+        function estimateServerHopsToNext(currentXpVal, bonusDodges) {
+            const targetXp = getNextDodgeXp(currentXpVal);
+            if (targetXp === null) return null; // already max
+
+            let simXp = currentXpVal;
+            let hops = 0;
+            const SAFETY_LIMIT = 10000; 
+
+            while (simXp < targetXp && hops < SAFETY_LIMIT) {
+                const base = calculateBaseDodges(simXp);
+                const total = base + bonusDodges;
+                const xpPerHop = total * 2; 
+                if (xpPerHop <= 0) return Infinity;
+                simXp += xpPerHop;
+                hops++;
+            }
+
+            if (hops >= SAFETY_LIMIT) return Infinity;
+            return hops;
+        }
+
         function updateStats() {
             const baseDodges = calculateBaseDodges(currentXp);
             let bonusDodges = 0;
@@ -130,12 +173,28 @@
 
             totalDodges = baseDodges + bonusDodges;
 
-            // Update the display
             xpDisplay.textContent = currentXp;
             totalDodgesDisplay.textContent = totalDodges;
+
+            const nextDodgeXp = getNextDodgeXp(currentXp);
+            if (nextDodgeXp !== null) {
+                const xpNeeded = Math.max(0, nextDodgeXp - currentXp);
+                xpToNextDisplay.textContent = xpNeeded;
+
+                const hops = estimateServerHopsToNext(currentXp, bonusDodges);
+                if (hops === null) {
+                    serverHopsDisplay.textContent = "Max";
+                } else if (hops === Infinity) {
+                    serverHopsDisplay.textContent = "∞";
+                } else {
+                    serverHopsDisplay.textContent = hops;
+                }
+            } else {
+                xpToNextDisplay.textContent = "Max";
+                serverHopsDisplay.textContent = "Max";
+            }
         }
 
-        // Function to set a toggle's state (active/inactive)
         function setToggleState(toggle, isActive) {
             if (isActive) {
                 toggle.classList.add('active', 'bg-green-600');
@@ -146,37 +205,35 @@
             }
         }
 
-        // --- Event Listeners ---
-
-        // Initial Calculation
         calculateBtn.addEventListener('click', () => {
             const xpValue = parseInt(xpInput.value, 10);
             if (isNaN(xpValue) || xpValue < 0) {
+                xpError.classList.remove('hidden');
+                xpError.textContent = "Please enter a valid XP value.";
+                return;
+            }
+            if (xpValue > 5000) {
+                xpError.textContent = "Max XP is 5000.";
                 xpError.classList.remove('hidden');
                 return;
             }
             xpError.classList.add('hidden');
             
             currentXp = xpValue;
-            
-            // Go to the main screen and run the first calculation
             xpScreen.classList.add('hidden');
             mainScreen.classList.remove('hidden');
             mainScreen.classList.add('flex');
             updateStats();
         });
 
-        // Human v2 Toggle
         humanToggle.addEventListener('click', () => {
             const isActive = humanToggle.classList.toggle('active');
             setToggleState(humanToggle, isActive);
             updateStats();
         });
 
-        // Pale Scarf Toggle
         scarfToggle.addEventListener('click', () => {
             const wasActive = scarfToggle.classList.contains('active');
-            // Deactivate both first, then activate the one that was clicked (if it wasn't already active)
             setToggleState(scarfToggle, false);
             setToggleState(cloakToggle, false);
             if (!wasActive) {
@@ -185,7 +242,6 @@
             updateStats();
         });
 
-        // Holiday Cloak Toggle
         cloakToggle.addEventListener('click', () => {
             const wasActive = cloakToggle.classList.contains('active');
             setToggleState(scarfToggle, false);
@@ -196,11 +252,13 @@
             updateStats();
         });
 
-        // Update XP Button
         updateXpBtn.addEventListener('click', () => {
             const xpToAdd = totalDodges * 2;
-            currentXp += xpToAdd;
-            // Recalculate everything since base dodges might have changed
+            if (currentXp + xpToAdd > 5000) {
+                currentXp = 5000;
+            } else {
+                currentXp += xpToAdd;
+            }
             updateStats();
         });
 
